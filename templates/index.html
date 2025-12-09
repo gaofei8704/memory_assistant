@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 记忆助手{% endblock %}
+
+{% block content %}
+<div class="container">
+    <section class="hero">
+        <h2>欢迎使用记忆助手</h2>
+        <p>基于艾宾浩斯记忆曲线的智能学习系统</p>
+    </section>
+
+   <!-- 在 templates/index.html 中修改快速开始部分 -->
+
+    <section class="quick-actions">
+        <h3>快速开始</h3>
+        {% if decks %}
+            <div class="decks-quick-list">
+                {% for deck in decks %}
+                <div class="quick-deck-card">
+                    <h4>{{ deck.name }}</h4>
+                    <p>{{ deck.description or '暂无描述' }}</p>
+                    <div class="quick-deck-stats">
+                        <span>{{ deck.content_count }} 个内容</span>
+                        <span>{{ deck.learned_count }} 已学习</span>
+                    </div>
+                    <div class="quick-deck-actions">
+                        <!-- 使用智能学习入口 -->
+                        <a href="{{ url_for('learn', deck_id=deck.id) }}" class="btn btn-primary">
+                            {% if deck.study_config and deck.study_config.is_configured %}
+                                继续学习
+                            {% else %}
+                                开始学习
+                            {% endif %}
+                        </a>
+                        <a href="{{ url_for('study_setup', deck_id=deck.id) }}" class="btn btn-secondary">学习设置</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-decks-message">
+                <p>暂无学习库，请先创建学习库</p>
+                <a href="{{ url_for('decks') }}" class="btn btn-primary">创建学习库</a>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="stats-section">
+        <h3>学习概览</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>学习库数量</h3>
+                <div class="stat-number">{{ decks|length }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>总内容数量</h3>
+                <div class="stat-number">{{ total_content }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>今日学习</h3>
+                <p class="stat-number">{{ today_study_count or 0 }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>正确率</h3>
+                <p class="stat-number">{{ accuracy_rate or 0 }}%</p>
+            </div>
+        </div>
+    </section>
+
+    {% if recent_sessions %}
+    <section class="recent-sessions">
+        <h3>最近学习会话</h3>
+        <div class="session-list">
+            {% for session in recent_sessions %}
+            <div class="session-item">
+                <div class="session-deck">{{ session.deck.name }}</div>
+                <div class="session-stats">
+                    <span>{{ session.total_items }} 项</span>
+                    <span>{{ session.correct_answers }} 正确</span>
+                    <!-- 不使用过滤器，直接格式化时间 -->
+                    <span>
+                        {% if session.created_at %}
+                            {{ session.created_at.strftime('%m-%d %H:%M') }}
+                        {% else %}
+                            未知时间
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="session-action">
+                    <a href="{{ url_for('practice', deck_id=session.deck.id) }}" class="btn btn-small">继续练习</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<style>
+.quick-actions {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.quick-actions h3 {
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+}
+
+.decks-quick-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.quick-deck-card {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s;
+}
+
+.quick-deck-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.quick-deck-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+}
+
+.quick-deck-card p {
+    color: #6c757d;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.quick-deck-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+
+.quick-deck-stats span {
+    background: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    color: #6c757d;
+}
+
+.quick-deck-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.quick-deck-actions .btn {
+    flex: 1;
+    text-align: center;
+}
+
+.no-decks-message {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.no-decks-message p {
+    margin-bottom: 1rem;
+}
+
+.session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: white;
+}
+
+.session-deck {
+    font-weight: bold;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.session-stats {
+    display: flex;
+    gap: 1rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+    flex: 2;
+}
+
+.session-action {
+    flex: 0 0 auto;
+}
+
+.btn-small {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+    .decks-quick-list {
+        grid-template-columns: 1fr;
+    }
+
+    .session-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .session-stats {
+        flex-wrap: wrap;
+    }
+}
+</style>
+{% endblock %}

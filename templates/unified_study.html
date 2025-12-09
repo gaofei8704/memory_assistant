@@ -1,0 +1,841 @@
+<!-- templates/unified_study.html -->
+{% extends "base.html" %}
+
+{% block title %}统一学习 - {{ deck.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="study-header">
+        <h2>{{ deck.name }}</h2>
+        <div class="session-info">
+            <div class="session-progress">
+                <span id="progressText">0/0</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            <div class="study-timer">
+                <span id="studyTimer">00:00:00</span>
+            </div>
+            <button class="btn btn-secondary" onclick="endStudyEarly()">提前结束</button>
+        </div>
+    </div>
+
+    <div class="study-container">
+        <!-- 内容显示区域 -->
+        <div class="content-display" id="studyContent">
+            <div class="loading-message">
+                <p>加载学习内容中...</p>
+            </div>
+        </div>
+
+        <!-- 答案输入区域 -->
+        <div class="study-input" id="studyInput" style="display: none;">
+            <h3>请输入答案:</h3>
+            <textarea id="userInput" placeholder="" rows="3"></textarea>
+            <div class="input-actions">
+                <button class="btn btn-primary" onclick="submitAnswer()">提交答案</button>
+                <button class="btn btn-secondary" onclick="showAnswer()">查看答案</button>
+            </div>
+        </div>
+
+        <!-- 结果反馈区域 -->
+        <div class="study-result" id="studyResult" style="display: none;">
+            <div class="result-content">
+                <h3 id="resultTitle">结果</h3>
+                <div class="answer-comparison">
+                    <div class="user-answer">
+                        <strong>你的答案:</strong>
+                        <span id="userAnswerText"></span>
+                    </div>
+                    <div class="correct-answer">
+                        <strong>正确答案:</strong>
+                        <span id="correctAnswerText"></span>
+                    </div>
+                </div>
+                <div class="example-section" id="exampleSection" style="display: none;">
+                    <strong>示例:</strong>
+                    <p id="exampleText"></p>
+                </div>
+                        <button class="btn btn-easy" onclick="markAsTooEasy()">
+                        <span>太简单了</span>
+                        <small>我已经完全记住</small>
+                    </button>
+                    <button class="btn btn-next" onclick="moveToNextContent()">
+                        <span>下一个</span>
+                        <small>继续学习</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.study-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.session-progress {
+    min-width: 200px;
+}
+
+.session-progress span {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #3498db;
+    transition: width 0.3s;
+    width: 0%;
+}
+
+.study-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.content-display {
+    background: white;
+    padding: 3rem 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+    text-align: center;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.content-text {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.content-type {
+    display: inline-block;
+    background: #e9ecef;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.study-input {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.study-input h3 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+#userInput {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    transition: border-color 0.3s;
+    resize: vertical;
+    min-height: 80px;
+}
+
+#userInput:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.input-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.study-result {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.answer-comparison {
+    margin-bottom: 1.5rem;
+}
+
+.user-answer, .correct-answer {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.user-answer {
+    background: #f8f9fa;
+    border-left: 4px solid #6c757d;
+}
+
+.correct-answer {
+    background: #e8f5e8;
+    border-left: 4px solid #27ae60;
+}
+
+.example-section {
+    padding: 1rem;
+    background: #fff3e0;
+    border-radius: 6px;
+    border-left: 4px solid #f39c12;
+    margin-bottom: 1.5rem;
+}
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-easy {
+    background-color: #95a5a6;
+    color: white;
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn-easy:hover {
+    background-color: #7f8c8d;
+}
+
+.btn-next {
+    background-color: #3498db;
+    color: white;
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn-next:hover {
+    background-color: #2980b9;
+}
+
+.btn-remember {
+    background-color: #27ae60;
+    color: white;
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn-remember:hover {
+    background-color: #219653;
+}
+
+.btn-forget {
+    background-color: #e74c3c;
+    color: white;
+    flex: 1;
+    min-width: 120px;
+}
+
+.btn-forget:hover {
+    background-color: #c0392b;
+}
+
+.navigation-buttons {
+    text-align: center;
+}
+
+.btn-next {
+    background-color: #3498db;
+    color: white;
+    padding: 0.75rem 2rem;
+}
+
+.btn-next:hover {
+    background-color: #2980b9;
+}
+
+.loading-message, .error-message {
+    text-align: center;
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+.correct .user-answer {
+    border-left-color: #27ae60;
+    background: #e8f5e8;
+}
+
+.incorrect .user-answer {
+    border-left-color: #e74c3c;
+    background: #f8d7da;
+}
+
+.empty-state, .completion-state {
+    text-align: center;
+    padding: 2rem;
+}
+
+.empty-state p, .completion-state p {
+    font-size: 1.2rem;
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .study-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .session-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .feedback-buttons {
+        flex-direction: column;
+    }
+
+    .btn-easy, .btn-remember, .btn-forget {
+        width: 100%;
+    }
+
+    .content-display {
+        padding: 2rem 1rem;
+    }
+
+    .content-text {
+        font-size: 1.5rem;
+    }
+}
+</style>
+
+<script>
+// 当前学习状态
+let currentStudy = {
+    id: null,
+    content: [],
+    currentIndex: 0,
+    startTime: Date.now()
+};
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    startUnifiedStudy({{ deck.id }});
+});
+
+// 开始统一学习
+async function startUnifiedStudy(deckId) {
+    try {
+        const response = await fetch('/api/study/unified/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                deck_id: deckId,
+                daily_goal: 20
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            currentStudy.id = result.batch_id;
+            currentStudy.content = result.content;
+            currentStudy.currentIndex = 0;
+            showCurrentContent();
+            updateProgress();
+        } else {
+            showError(result.message || '加载学习内容失败');
+        }
+    } catch (error) {
+        showError('网络错误: ' + error.message);
+    }
+}
+
+// 显示当前学习内容
+function showCurrentContent() {
+    if (currentStudy.content.length === 0) {
+        showEmptyState();
+        return;
+    }
+
+    if (currentStudy.currentIndex >= currentStudy.content.length) {
+        showCompletionState();
+        return;
+    }
+
+    const content = currentStudy.content[currentStudy.currentIndex];
+
+    document.getElementById('studyContent').innerHTML = `
+        <div>
+            <div class="content-text">${escapeHtml(content.display_text)}</div>
+            <span class="content-type">${content.type}</span>
+        </div>
+    `;
+
+    // 设置输入框占位符并显示
+    document.getElementById('userInput').placeholder = content.input_placeholder;
+    document.getElementById('studyInput').style.display = 'block';
+    document.getElementById('studyResult').style.display = 'none';
+    document.getElementById('userInput').value = '';
+    document.getElementById('userInput').focus();
+
+    currentStudy.startTime = Date.now();
+}
+
+// 提交答案
+function submitAnswer() {
+    const userInput = document.getElementById('userInput').value.trim();
+    if (!userInput) {
+        alert('请输入答案');
+        return;
+    }
+
+    document.getElementById('studyInput').style.display = 'none';
+    showResult(userInput);
+}
+
+// 显示答案和示例
+function showAnswer() {
+    const userInput = document.getElementById('userInput').value.trim() || '未作答';
+    document.getElementById('studyInput').style.display = 'none';
+    showResult(userInput, true);
+}
+
+// 显示结果
+function showResult(userInput, showedAnswer = false) {
+    if (currentStudy.content.length === 0 || currentStudy.currentIndex >= currentStudy.content.length) {
+        return;
+    }
+
+    const content = currentStudy.content[currentStudy.currentIndex];
+    const isCorrect = userInput.toLowerCase() === content.answer.toLowerCase();
+
+    const resultTitle = document.getElementById('resultTitle');
+    const userAnswerText = document.getElementById('userAnswerText');
+    const correctAnswerText = document.getElementById('correctAnswerText');
+    const exampleSection = document.getElementById('exampleSection');
+    const exampleText = document.getElementById('exampleText');
+
+    // 设置结果标题
+    if (showedAnswer) {
+        resultTitle.textContent = '答案已显示';
+    } else {
+        resultTitle.textContent = isCorrect ? '回答正确！' : '回答错误';
+    }
+
+    // 设置答案对比
+    userAnswerText.textContent = userInput;
+    correctAnswerText.textContent = content.answer;
+
+    // 设置示例
+    if (content.example) {
+        exampleText.textContent = content.example;
+        exampleSection.style.display = 'block';
+    } else {
+        exampleSection.style.display = 'none';
+    }
+
+    // 设置样式
+    const resultSection = document.getElementById('studyResult');
+    resultSection.className = 'study-result';
+    if (!showedAnswer) {
+        if (isCorrect) {
+            resultSection.classList.add('correct');
+        } else {
+            resultSection.classList.add('incorrect');
+        }
+    }
+
+    // 显示结果区域
+    resultSection.style.display = 'block';
+}
+
+
+// 修改 markAsTooEasy 函数
+async function markAsTooEasy() {
+    if (currentStudy.content.length === 0 || currentStudy.currentIndex >= currentStudy.content.length) {
+        return;
+    }
+
+    const responseTime = Math.floor((Date.now() - currentStudy.startTime) / 1000);
+    const currentContent = currentStudy.content[currentStudy.currentIndex];
+    const userInput = document.getElementById('userInput').value;
+
+    try {
+        // 记录学习进度，标记为太简单
+        const response = await fetch('/api/study/unified/record', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                batch_id: currentStudy.id,
+                content_id: currentContent.id,
+                deck_id: {{ deck.id }},
+                feedback_type: 'too_easy',
+                user_input: userInput,
+                response_time: responseTime,
+                is_correct: true  // 标记为太简单时认为是正确的
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            moveToNextContent();
+        } else {
+            alert('提交失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+// 修改 showResult 函数，移除答对答错的按钮
+function showResult(userInput, showedAnswer = false) {
+    if (currentStudy.content.length === 0 || currentStudy.currentIndex >= currentStudy.content.length) {
+        return;
+    }
+
+    const content = currentStudy.content[currentStudy.currentIndex];
+    const isCorrect = userInput.toLowerCase() === content.answer.toLowerCase();
+
+    const resultTitle = document.getElementById('resultTitle');
+    const userAnswerText = document.getElementById('userAnswerText');
+    const correctAnswerText = document.getElementById('correctAnswerText');
+    const exampleSection = document.getElementById('exampleSection');
+    const exampleText = document.getElementById('exampleText');
+
+    // 设置结果标题
+    if (showedAnswer) {
+        resultTitle.textContent = '答案已显示';
+    } else {
+        resultTitle.textContent = isCorrect ? '回答正确！' : '回答错误';
+    }
+
+    // 设置答案对比
+    userAnswerText.textContent = userInput;
+    correctAnswerText.textContent = content.answer;
+
+    // 设置示例
+    if (content.example) {
+        exampleText.textContent = content.example;
+        exampleSection.style.display = 'block';
+    } else {
+        exampleSection.style.display = 'none';
+    }
+
+    // 显示结果区域，但只显示简化后的按钮
+    document.getElementById('studyResult').style.display = 'block';
+}
+
+
+// 移动到下一个内容
+function moveToNextContent() {
+    currentStudy.currentIndex++;
+
+    // 检查是否已完成
+    if (currentStudy.currentIndex >= currentStudy.content.length) {
+        completeStudy();
+        showCompletionState();
+    } else {
+        showCurrentContent();
+        updateProgress();
+    }
+}
+
+// 加载下一个内容
+async function loadNextContent() {
+    moveToNextContent();
+}
+
+// 完成学习
+async function completeStudy() {
+    try {
+        await fetch('/api/study/unified/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                batch_id: currentStudy.id
+            })
+        });
+    } catch (error) {
+        console.error('完成学习失败:', error);
+    }
+}
+
+// 更新进度条
+function updateProgress() {
+    const total = Math.max(currentStudy.content.length, 1);
+    const progress = (currentStudy.currentIndex / total) * 100;
+
+    document.getElementById('progressFill').style.width = `${progress}%`;
+    document.getElementById('progressText').textContent =
+        `${currentStudy.currentIndex}/${total}`;
+}
+
+// 提前结束学习
+async function endStudyEarly() {
+    if (!confirm('确定要提前结束学习吗？')) {
+        return;
+    }
+
+    try {
+        await completeStudy();
+        window.location.href = '/';
+    } catch (error) {
+        alert('结束失败: ' + error.message);
+    }
+}
+
+// 显示空状态
+function showEmptyState() {
+    document.getElementById('studyContent').innerHTML = `
+        <div class="empty-state">
+            <p>没有可学习的内容</p>
+            <a href="/" class="btn btn-primary">返回首页</a>
+        </div>
+    `;
+    document.getElementById('studyInput').style.display = 'none';
+    document.getElementById('studyResult').style.display = 'none';
+}
+
+// 显示完成状态
+function showCompletionState() {
+    document.getElementById('studyContent').innerHTML = `
+        <div class="completion-state">
+            <h3>🎉 学习完成！</h3>
+            <p>您已完成本次学习计划</p>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="window.location.href='/'">返回首页</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('studyInput').style.display = 'none';
+    document.getElementById('studyResult').style.display = 'none';
+}
+
+// 错误处理
+function showError(message) {
+    document.getElementById('studyContent').innerHTML = `
+        <div class="error-state">
+            <p>加载失败: ${escapeHtml(message)}</p>
+            <button class="btn btn-primary" onclick="startUnifiedStudy({{ deck.id }})">重试</button>
+            <a href="/" class="btn btn-secondary">返回首页</a>
+        </div>
+    `;
+    document.getElementById('studyInput').style.display = 'none';
+    document.getElementById('studyResult').style.display = 'none';
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+// 回车提交答案
+document.addEventListener('DOMContentLoaded', function() {
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitAnswer();
+            }
+        });
+    }
+});
+
+// 在 unified_study.html 中添加时长计时功能
+let studyTimerInterval = null;
+let studyTimer = null;
+let studyStartTime = null;
+let totalStudyTime = 0; // 已记录的学习时间（秒）
+// 页面加载完成后初始化计时器
+document.addEventListener('DOMContentLoaded', function() {
+    startStudyTimer();
+    startUnifiedStudy({{ deck.id }});
+});
+
+// 开始计时
+
+// 开始学习计时器
+function startStudyTimer() {
+    // 如果已经有开始时间，计算已学习时间
+    if (studyStartTime) {
+        const now = new Date();
+        totalStudyTime += Math.floor((now - studyStartTime) / 1000);
+    }
+
+    studyStartTime = new Date();
+
+    // 清除现有计时器
+    if (studyTimerInterval) {
+        clearInterval(studyTimerInterval);
+    }
+
+    // 启动新的计时器
+    studyTimerInterval = setInterval(updateStudyTimer, 1000);
+}
+
+// 更新学习计时器显示
+function updateStudyTimer() {
+    if (studyStartTime) {
+        const now = new Date();
+        const sessionTime = Math.floor((now - studyStartTime) / 1000);
+        const totalTime = totalStudyTime + sessionTime;
+
+        const hours = Math.floor(totalTime / 3600);
+        const minutes = Math.floor((totalTime % 3600) / 60);
+        const seconds = totalTime % 60;
+
+        document.getElementById('studyTimer').textContent =
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+// 在页面关闭前保存学习时间
+window.addEventListener('beforeunload', function() {
+    stopStudyTimer();
+    if (currentStudy.id && totalStudyTime > 0) {
+        updateStudyDuration(totalStudyTime);
+    }
+});
+// 更新学习时长显示
+
+// 更新学习时长到服务器
+async function updateStudyDuration(duration) {
+    if (!currentStudy.id || duration <= 0) return;
+
+    try {
+        await fetch('/api/study/unified/update_duration', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                batch_id: currentStudy.id,
+                duration: duration
+            })
+        });
+    } catch (error) {
+        console.error('更新学习时长失败:', error);
+    }
+}
+
+// 修改 moveToNextContent 函数，在学习完成时也保存时间
+function moveToNextContent() {
+    currentStudy.currentIndex++;
+
+    // 检查是否已完成
+    if (currentStudy.currentIndex >= currentStudy.content.length) {
+        completeStudy();
+        showCompletionState();
+    } else {
+        showCurrentContent();
+        updateProgress();
+        // 重新开始计时器（每个内容项重新计时）
+        startStudyTimer();
+    }
+}
+
+// 修改 completeStudy 函数以包含时间记录
+async function completeStudy() {
+    try {
+        // 停止计时器并保存时间
+        stopStudyTimer();
+        if (totalStudyTime > 0) {
+            await updateStudyDuration(totalStudyTime);
+        }
+
+        await fetch('/api/study/unified/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                batch_id: currentStudy.id
+            })
+        });
+    } catch (error) {
+        console.error('完成学习失败:', error);
+    }
+}
+// 在页面卸载时记录学习时长
+window.addEventListener('beforeunload', function() {
+    stopStudyTimer();
+});
+
+// 在开始学习时启动计时器
+document.addEventListener('DOMContentLoaded', function() {
+    startStudyTimer();
+    // ... 其他初始化代码
+});
+
+</script>
+<style>.study-timer {
+    background: #3498db;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+</style>
+{% endblock %}

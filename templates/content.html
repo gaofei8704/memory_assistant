@@ -1,0 +1,812 @@
+{% extends "base.html" %}
+
+{% block title %}内容管理 - 记忆助手{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>内容管理 - {{ deck.name }}</h2>
+        <div>
+            <a href="{{ url_for('practice', deck_id=deck.id) }}" class="btn btn-primary">开始练习</a>
+            <button class="btn btn-primary" onclick="showAddContentModal()">添加内容</button>
+            <button class="btn btn-info" onclick="showBatchImportModal()">批量导入</button>
+            <a href="{{ url_for('decks') }}" class="btn btn-secondary">返回学习库</a>
+        </div>
+    </div>
+
+    <!-- 内容统计 -->
+    <div class="content-stats">
+        <div class="stat-item">
+            <span class="stat-label">总内容:</span>
+            <span class="stat-value">{{ contents|length }}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">已学习:</span>
+            <span class="stat-value" id="learnedCount">0</span>
+        </div>
+    </div>
+
+    <div class="content-list">
+        {% if contents %}
+            {% for content in contents %}
+            <div class="content-item" data-content-id="{{ content.id }}">
+                <div class="content-main">
+                    <div class="content-front">{{ content.front }}</div>
+                    <div class="content-back">{{ content.back }}</div>
+                    {% if content.example %}
+                    <div class="content-example">{{ content.example }}</div>
+                    {% endif %}
+                    <!-- 添加新的字段显示 -->
+                    <div class="content-meta-info">
+                        {% if content.unit %}
+                        <span class="meta-unit">单元: {{ content.unit }}</span>
+                        {% endif %}
+                        {% if content.page %}
+                        <span class="meta-page">页码: {{ content.page }}</span>
+                        {% endif %}
+                        {% if content.order %}
+                        <span class="meta-order">序号: {{ content.order }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="content-meta">
+                    <span class="content-type">{{ content.type }}</span>
+                    {% if content.status %}
+                    <span class="content-status status-{{ content.status.status }}">
+                        {{ content.status.status }}
+                    </span>
+                    {% endif %}
+                    <button class="btn btn-danger btn-small" onclick="deleteContent({{ content.id }})">删除</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <p>暂无内容</p>
+                <div class="empty-actions">
+                    <button class="btn btn-primary" onclick="showAddContentModal()">添加第一个内容</button>
+                    <button class="btn btn-info" onclick="showBatchImportModal()">批量导入内容</button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- 分页控件 -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination-container">
+        <nav aria-label="内容分页">
+            <ul class="pagination">
+                <!-- 上一页 -->
+                {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('content_management', deck_id=deck.id, page=pagination.prev_num) }}">上一页</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">上一页</span>
+                    </li>
+                {% endif %}
+
+                <!-- 页码 -->
+                {% for page_num in pagination.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('content_management', deck_id=deck.id, page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- 下一页 -->
+                {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('content_management', deck_id=deck.id, page=pagination.next_num) }}">下一页</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">下一页</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        <div class="pagination-info">
+            第 {{ pagination.page }} 页，共 {{ pagination.pages }} 页，总计 {{ pagination.total }} 条内容
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 添加内容模态框 -->
+<div id="addContentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>添加内容</h3>
+            <span class="close" onclick="closeModal('addContentModal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="addContentForm">
+                <div class="form-group">
+                    <label for="contentType">内容类型</label>
+                    <select id="contentType" name="type" class="form-control">
+                        <option value="english_word">英语单词</option>
+                        <option value="english_phrase">英语短语</option>
+                        <option value="english_sentence">英语句子</option>
+                        <option value="english_grammar">英语语法</option>
+                        <option value="english_question">英语问题</option>
+                        <option value="english_expression">英语表达</option>
+                        <option value="verb_conjugation">动词变化</option>
+                        <option value="chinese_word">中文字词</option>
+                        <option value="chinese_poem">古诗文</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="contentFront">正面内容</label>
+                    <input type="text" id="contentFront" name="front" required class="form-control">
+                    <small>如：单词、词语、诗句等</small>
+                </div>
+                <div class="form-group">
+                    <label for="contentBack">背面内容</label>
+                    <input type="text" id="contentBack" name="back" required class="form-control">
+                    <small>如：翻译、释义等</small>
+                </div>
+                <div class="form-group">
+                    <label for="contentExample">示例（可选）</label>
+                    <textarea id="contentExample" name="example" rows="3" class="form-control"></textarea>
+                    <small>如：例句、用法等</small>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addContentModal')">取消</button>
+            <button class="btn btn-primary" onclick="addContent()">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量导入模态框 -->
+<div id="batchImportModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>批量导入内容</h3>
+            <span class="close" onclick="closeModal('batchImportModal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="import-options">
+                <h4>选择导入方式</h4>
+                <div class="option-buttons">
+                    <button class="btn btn-secondary" onclick="showJsonImport()">JSON文件导入</button>
+                    <button class="btn btn-secondary" onclick="showTextImport()">文本粘贴导入</button>
+                </div>
+            </div>
+
+            <!-- JSON文件导入 -->
+            <div id="jsonImportSection" class="import-section">
+                <h4>JSON文件导入</h4>
+                <p>上传JSON格式的内容文件</p>
+                <div class="file-upload">
+                    <input type="file" id="jsonFile" accept=".json" class="file-input">
+                    <label for="jsonFile" class="file-label">选择JSON文件</label>
+                    <div id="fileName" class="file-name">未选择文件</div>
+                </div>
+                <div class="template-download">
+                    <p>下载模板文件：</p>
+                    <button class="btn btn-small" onclick="downloadTemplate()">下载JSON模板</button>
+                </div>
+            </div>
+
+            <!-- 文本粘贴导入 -->
+            <div id="textImportSection" class="import-section" style="display: none;">
+                <h4>文本粘贴导入</h4>
+                <p>粘贴JSON格式的内容数据</p>
+                <textarea id="jsonText" rows="10" class="form-control" placeholder='[{"type": "english_word", "front": "hello", "back": "你好", "example": "Hello world!"}]'></textarea>
+                <div class="format-example">
+                    <p><strong>格式示例：</strong></p>
+                    <pre>[
+  {
+    "type": "english_word",
+    "front": "apple",
+    "back": "苹果",
+    "example": "I eat an apple."
+  }
+]</pre>
+                </div>
+            </div>
+
+            <!-- 导入预览 -->
+            <div id="importPreview" class="import-preview" style="display: none;">
+                <h4>导入预览</h4>
+                <div id="previewContent" class="preview-content"></div>
+                <div class="preview-stats">
+                    <span>总计: <span id="previewCount">0</span> 条内容</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('batchImportModal')">取消</button>
+            <button class="btn btn-primary" id="importButton" onclick="importContent()" disabled>开始导入</button>
+            <button class="btn btn-info" id="previewButton" onclick="previewContent()" style="display: none;">预览</button>
+        </div>
+    </div>
+</div>
+
+<!-- 导入结果模态框 -->
+<div id="importResultModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>导入结果</h3>
+            <span class="close" onclick="closeModal('importResultModal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="importResultContent"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeModal('importResultModal'); location.reload();">确定</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.content-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: #3498db;
+    font-size: 1.2rem;
+}
+
+.content-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-new { background: #e3f2fd; color: #1976d2; }
+.status-learning { background: #fff3e0; color: #f57c00; }
+.status-review { background: #e8f5e8; color: #388e3c; }
+.status-mastered { background: #e8f5e8; color: #2e7d32; }
+.status-too_easy { background: #f5f5f5; color: #757575; }
+
+.empty-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.import-options {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.option-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.import-section {
+    margin-bottom: 1.5rem;
+}
+
+.file-upload {
+    margin: 1rem 0;
+}
+
+.file-input {
+    display: none;
+}
+
+.file-label {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #3498db;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.file-label:hover {
+    background: #2980b9;
+}
+
+.file-name {
+    margin-top: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.template-download {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.format-example {
+    margin-top: 1rem;
+}
+
+.format-example pre {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+}
+
+.import-preview {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.preview-content {
+    margin-bottom: 1rem;
+}
+
+.preview-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border-radius: 4px;
+    border-left: 4px solid #3498db;
+}
+
+.preview-front {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.preview-back {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.preview-stats {
+    text-align: center;
+    font-weight: 600;
+    color: #2c3e50;
+}
+.pagination-container {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.pagination {
+    display: inline-flex;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.page-item {
+    display: inline;
+}
+
+.page-link {
+    position: relative;
+    display: block;
+    padding: 0.5rem 0.75rem;
+    margin-left: -1px;
+    line-height: 1.25;
+    color: #3498db;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    text-decoration: none;
+}
+
+.page-link:hover {
+    color: #2980b9;
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.page-item.disabled .page-link {
+    color: #6c757d;
+    pointer-events: none;
+    background-color: #fff;
+    border-color: #dee2e6;
+}
+
+.page-item.active .page-link {
+    z-index: 1;
+    color: #fff;
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.pagination-info {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+</style>
+
+<script>
+// 获取学习状态统计
+async function loadContentStats() {
+    try {
+        // 这里可以添加API来获取学习状态统计
+        // 暂时使用简单统计
+        const learnedCount = document.querySelectorAll('.content-status').length;
+        document.getElementById('learnedCount').textContent = learnedCount;
+    } catch (error) {
+        console.error('加载统计失败:', error);
+    }
+}
+
+// 批量导入功能
+function showBatchImportModal() {
+    document.getElementById('batchImportModal').style.display = 'block';
+    resetImportForm();
+}
+
+function showJsonImport() {
+    document.getElementById('jsonImportSection').style.display = 'block';
+    document.getElementById('textImportSection').style.display = 'none';
+    document.getElementById('previewButton').style.display = 'none';
+    document.getElementById('importButton').style.display = 'block';
+    resetImportForm();
+}
+
+function showTextImport() {
+    document.getElementById('jsonImportSection').style.display = 'none';
+    document.getElementById('textImportSection').style.display = 'block';
+    document.getElementById('previewButton').style.display = 'block';
+    document.getElementById('importButton').style.display = 'block';
+    resetImportForm();
+}
+
+function resetImportForm() {
+    document.getElementById('jsonFile').value = '';
+    document.getElementById('fileName').textContent = '未选择文件';
+    document.getElementById('jsonText').value = '';
+    document.getElementById('importPreview').style.display = 'none';
+    document.getElementById('importButton').disabled = true;
+}
+
+// 文件选择处理
+document.getElementById('jsonFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('importButton').disabled = false;
+    }
+});
+
+// 下载模板
+function downloadTemplate() {
+    const template = [
+        {
+            "order": 1,
+            "english": "example",
+            "chinese": "例子",
+            "example": "This is an example sentence.",
+            "type": "单词",
+            "unit": "U1",
+            "page": "pp1-10"
+        },
+        {
+            "order": 2,
+            "english": "word",
+            "chinese": "单词",
+            "example": "Learn new words every day.",
+            "type": "单词",
+            "unit": "U1",
+            "page": "pp1-10"
+        }
+    ];
+
+    const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'memory_assistant_template.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// 预览内容
+async function previewContent() {
+    const jsonText = document.getElementById('jsonText').value;
+    if (!jsonText.trim()) {
+        alert('请输入JSON数据');
+        return;
+    }
+
+    try {
+        const contentData = JSON.parse(jsonText);
+        if (!Array.isArray(contentData)) {
+            alert('JSON数据必须是数组格式');
+            return;
+        }
+
+        displayPreview(contentData);
+        document.getElementById('importButton').disabled = false;
+
+    } catch (error) {
+        alert('JSON格式错误: ' + error.message);
+    }
+}
+
+function displayPreview(contentData) {
+    const previewContent = document.getElementById('previewContent');
+    const previewCount = document.getElementById('previewCount');
+
+    previewContent.innerHTML = '';
+    previewCount.textContent = contentData.length;
+
+    contentData.slice(0, 10).forEach(item => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.innerHTML = `
+            <div class="preview-front">${item.front}</div>
+            <div class="preview-back">${item.back}</div>
+            ${item.example ? `<div class="preview-example">${item.example}</div>` : ''}
+            <div class="preview-type">类型: ${item.type}</div>
+        `;
+        previewContent.appendChild(previewItem);
+    });
+
+    if (contentData.length > 10) {
+        const moreItem = document.createElement('div');
+        moreItem.className = 'preview-item';
+        moreItem.innerHTML = `<div style="text-align: center; color: #6c757d;">... 还有 ${contentData.length - 10} 条内容</div>`;
+        previewContent.appendChild(moreItem);
+    }
+
+    document.getElementById('importPreview').style.display = 'block';
+}
+
+// 导入内容
+async function importContent() {
+    let contentData = [];
+    const importButton = document.getElementById('importButton');
+
+    // 禁用按钮防止重复点击
+    importButton.disabled = true;
+    importButton.textContent = '导入中...';
+
+    try {
+        // 获取数据
+        if (document.getElementById('jsonImportSection').style.display !== 'none') {
+            // 文件导入
+            const file = document.getElementById('jsonFile').files[0];
+            if (!file) {
+                throw new Error('请选择文件');
+            }
+            contentData = await readFileAsJson(file);
+        } else {
+            // 文本导入
+            const jsonText = document.getElementById('jsonText').value;
+            if (!jsonText.trim()) {
+                throw new Error('请输入JSON数据');
+            }
+            contentData = JSON.parse(jsonText);
+        }
+
+        if (!Array.isArray(contentData)) {
+            throw new Error('JSON数据必须是数组格式');
+        }
+
+        // 批量导入
+        const result = await batchImportContent(contentData);
+        showImportResult(result);
+
+    } catch (error) {
+        alert('导入失败: ' + error.message);
+        importButton.disabled = false;
+        importButton.textContent = '开始导入';
+    }
+}
+
+function readFileAsJson(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const content = JSON.parse(e.target.result);
+                resolve(content);
+            } catch (error) {
+                reject(new Error('文件格式错误: ' + error.message));
+            }
+        };
+        reader.onerror = function() {
+            reject(new Error('读取文件失败'));
+        };
+        reader.readAsText(file);
+    });
+}
+
+async function batchImportContent(contentData) {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    // 逐条导入
+    for (let i = 0; i < contentData.length; i++) {
+        const item = contentData[i];
+        try {
+             const contentItem = {
+                type: item.type || 'english_word',
+                front: item.english || item.front || '',
+                back: item.chinese || item.back || '',
+                example: item.example || '',
+                unit: item.unit || '',
+                page: item.page || '',
+                order: item.order || 0
+            };
+            const response = await fetch('/api/content/{{ deck.id }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(contentItem)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                successCount++;
+            } else {
+                errorCount++;
+                errors.push(`第 ${i + 1} 条: ${result.message}`);
+            }
+        } catch (error) {
+            errorCount++;
+            errors.push(`第 ${i + 1} 条: 网络错误 - ${error.message}`);
+        }
+
+        // 添加延迟避免请求过快
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return {
+        total: contentData.length,
+        success: successCount,
+        error: errorCount,
+        errors: errors
+    };
+}
+
+function showImportResult(result) {
+    const resultContent = document.getElementById('importResultContent');
+
+    let html = `
+        <div class="result-summary">
+            <h4>导入完成</h4>
+            <div class="result-stats">
+                <div>总计: ${result.total} 条</div>
+                <div style="color: #27ae60;">成功: ${result.success} 条</div>
+                <div style="color: #e74c3c;">失败: ${result.error} 条</div>
+            </div>
+    `;
+
+    if (result.errors.length > 0) {
+        html += `
+            <div class="error-details">
+                <h5>错误详情:</h5>
+                <div class="error-list">
+                    ${result.errors.map(error => `<div class="error-item">${error}</div>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+
+    resultContent.innerHTML = html;
+    closeModal('batchImportModal');
+    document.getElementById('importResultModal').style.display = 'block';
+
+    // 重置导入按钮
+    document.getElementById('importButton').disabled = false;
+    document.getElementById('importButton').textContent = '开始导入';
+}
+
+// 原有的单个内容添加功能保持不变
+function showAddContentModal() {
+    document.getElementById('addContentModal').style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+async function addContent() {
+    const form = document.getElementById('addContentForm');
+    const formData = new FormData(form);
+
+    const contentData = {
+        type: formData.get('type'),
+        front: formData.get('front'),
+        back: formData.get('back'),
+        example: formData.get('example')
+    };
+
+    try {
+        const response = await fetch('/api/content/{{ deck.id }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(contentData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('内容添加成功');
+            closeModal('addContentModal');
+            location.reload();
+        } else {
+            alert('添加失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+async function deleteContent(contentId) {
+    if (!confirm('确定要删除这个内容吗？此操作不可恢复。')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/content/${contentId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('内容删除成功');
+            location.reload();
+        } else {
+            alert('删除失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadContentStats();
+});
+</script>
+{% endblock %}

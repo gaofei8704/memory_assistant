@@ -2,10 +2,10 @@ import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from models import *
 from config import config
-from utils import create_content_status, select_study_content, select_study_content_with_progress
+from utils import create_content_status, select_study_content, select_study_content_with_progress,synthesize_speech
 from datetime import datetime, timedelta
 from functools import wraps
-
+# app.py
 
 def create_app(config_name=None):
     if config_name is None:
@@ -1270,6 +1270,25 @@ def complete_unified_study():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'完成学习失败: {str(e)}'}), 500
+
+
+@app.route('/api/synthesize/<int:content_id>')
+def synthesize_content(content_id):
+    content = Content.query.get_or_404(content_id)
+    config = StudyConfig.query.filter_by(deck_id=content.deck_id).first()
+
+    if not config or config.learning_mode != 'listen':
+        return jsonify({'error': 'Learning mode is not set to listen'}), 400
+
+    # front_audio_url = synthesize_speech(content.front, ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+    # back_audio_url = synthesize_speech(content.back, ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+    front_audio_url = ''
+    back_audio_url = ''
+    return jsonify({
+        'front_audio': front_audio_url,
+        'back_audio': back_audio_url
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=5000)

@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}学习设置 - {{ deck.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>学习设置 - {{ deck.name }}</h2>
+        <div class="header-actions">
+            {% if deck.study_config and deck.study_config.is_configured %}
+            <a href="{{ url_for('practice', deck_id=deck.id, mode=deck.study_config.mode) }}" class="btn btn-info">使用当前设置开始练习</a>
+            {% endif %}
+            <a href="{{ url_for('decks') }}" class="btn btn-secondary">返回学习库</a>
+        </div>
+    </div>
+
+    <div class="setup-container">
+        <div class="setup-form">
+            <div class="setup-header">
+                <h3>学习设置</h3>
+                {% if deck.study_config and deck.study_config.is_configured %}
+                <div class="config-status configured">
+                    <i class="status-icon">✓</i>
+                    <span>已配置</span>
+                </div>
+                {% else %}
+                <div class="config-status not-configured">
+                    <i class="status-icon">!</i>
+                    <span>未配置</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 替换原有的学习模式设置部分 -->
+            <div class="form-group">
+                <label for="dailyGoal">每日学习目标</label>
+                <input type="number" id="dailyGoal" class="form-control" min="1" max="100" value="20">
+                <small>设置每天要学习的单词数量</small>
+            </div>
+
+            <div class="form-group">
+                <label for="studyOrder">学习顺序</label>
+                <select id="studyOrder" class="form-control">
+                    <option value="zh_first">第一轮：中文→英文，第二轮：英文→中文</option>
+                    <option value="en_first">第一轮：英文→中文，第二轮：中文→英文</option>
+                </select>
+                <small>选择学习的顺序模式</small>
+            </div>
+
+
+            <div class="study-preview">
+                <h4>学习预览</h4>
+                <div class="preview-example">
+                    <div class="preview-front">
+                        <strong>正面:</strong>
+                        <span id="previewFront">Hello</span>
+                    </div>
+                    <div class="preview-back">
+                        <strong>背面:</strong>
+                        <span id="previewBack">你好</span>
+                    </div>
+                    <div class="preview-input">
+                        <strong>输入框提示:</strong>
+                        <span id="previewPlaceholder">请输入中文翻译...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-actions">
+                <button class="btn btn-primary btn-large" onclick="saveAndStartPractice()">
+                    {% if deck.study_config and deck.study_config.is_configured %}
+                        更新设置并开始练习
+                    {% else %}
+                        保存设置并开始练习
+                    {% endif %}
+                </button>
+                <button class="btn btn-secondary" onclick="saveConfigOnly()">仅保存设置</button>
+            </div>
+        </div>
+
+        <div class="deck-info">
+            <h3>学习库信息</h3>
+            <div class="info-card">
+                <div class="info-item">
+                    <span class="info-label">总内容:</span>
+                    <span class="info-value">{{ total_content }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">已学习:</span>
+                    <span class="info-value">{{ learned_content }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">待复习:</span>
+                    <span class="info-value">{{ due_review }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">掌握内容:</span>
+                    <span class="info-value">{{ mastered_content }}</span>
+                </div>
+            </div>
+
+            {% if deck.study_config and deck.study_config.is_configured %}
+            <div class="current-config">
+                <h4>当前配置</h4>
+                <div class="config-item">
+                    <span class="config-label">学习模式:</span>
+                    <span class="config-value">
+                        {% if deck.study_config.mode == 'en_to_zh' %}
+                        显示英文，默写中文
+                        {% else %}
+                        显示中文，默写英文
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">配置时间:</span>
+                    <span class="config-value">{{ deck.study_config.updated_at.strftime('%Y-%m-%d %H:%M') if deck.study_config.updated_at else '未知' }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="quick-actions">
+                <a href="{{ url_for('content_management', deck_id=deck.id) }}" class="btn btn-secondary">
+                    管理内容
+                </a>
+                <a href="{{ url_for('practice', deck_id=deck.id) }}" class="btn btn-info">
+                    快速开始（使用默认设置）
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+// 替换原有的JavaScript代码
+<script>
+// 初始化配置
+let currentDeckId = {{ deck.id }};
+let currentDailyGoal = {{ deck.study_config.daily_goal if deck.study_config else 20 }};
+let currentStudyOrder = '{{ deck.study_config.study_order if deck.study_config else "zh_first" }}';
+
+// 保存配置并开始练习
+async function saveAndStartPractice() {
+    const dailyGoal = document.getElementById('dailyGoal').value;
+    const studyOrder = document.getElementById('studyOrder').value;
+
+    // 保存配置
+    const saved = await saveStudyConfig(dailyGoal, studyOrder);
+    if (saved) {
+        // 跳转到练习页面
+        window.location.href = `{{ url_for('practice', deck_id=deck.id) }}`;
+    }
+}
+
+// 仅保存配置
+async function saveConfigOnly() {
+    const dailyGoal = document.getElementById('dailyGoal').value;
+    const studyOrder = document.getElementById('studyOrder').value;
+
+    const saved = await saveStudyConfig(dailyGoal, studyOrder);
+    if (saved) {
+        alert('学习配置已保存');
+        // 刷新页面显示更新后的状态
+        location.reload();
+    }
+}
+
+// 保存学习配置到服务器
+async function saveStudyConfig(dailyGoal, studyOrder) {
+    try {
+        const response = await fetch('/api/study/config/' + currentDeckId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                daily_goal: parseInt(dailyGoal),
+                study_order: studyOrder
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            return true;
+        } else {
+            alert('保存失败: ' + result.message);
+            return false;
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+        return false;
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 设置表单默认值
+    document.getElementById('dailyGoal').value = currentDailyGoal;
+    document.getElementById('studyOrder').value = currentStudyOrder;
+});
+</script>
+
+
+<style>
+.setup-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.setup-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.setup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.setup-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.config-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.config-status.configured {
+    background: #e8f5e8;
+    color: #27ae60;
+}
+
+.config-status.not-configured {
+    background: #fff3e0;
+    color: #f39c12;
+}
+
+.status-icon {
+    font-weight: bold;
+}
+
+.setup-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.setup-actions .btn {
+    flex: 1;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.deck-info {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.deck-info h3 {
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+}
+
+.info-card {
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: #6c757d;
+}
+
+.info-value {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.current-config {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.current-config h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.config-label {
+    color: #6c757d;
+}
+
+.config-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.study-preview {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.study-preview h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.preview-example > div {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+    .setup-container {
+        grid-template-columns: 1fr;
+    }
+
+    .setup-actions {
+        flex-direction: column;
+    }
+
+    .header-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}

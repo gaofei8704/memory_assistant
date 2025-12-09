@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}记忆助手{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-logo">
+                    <a href="{{ url_for('index') }}" style="color: white; text-decoration: none;">记忆助手</a>
+                </h1>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="{{ url_for('index') }}" class="nav-link">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('decks') }}" class="nav-link">学习库</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 记忆助手 - 基于艾宾浩斯记忆曲线</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

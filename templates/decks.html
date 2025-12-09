@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}学习库管理 - 记忆助手{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>学习库管理</h2>
+        <button class="btn btn-primary" onclick="showCreateDeckModal()">新建学习库</button>
+    </div>
+
+    <div class="decks-grid">
+        {% for deck in decks %}
+        <div class="deck-card">
+            <div class="deck-header">
+                <h3>{{ deck.name }}</h3>
+                <div class="deck-actions">
+                    <button class="btn btn-small" onclick="editDeck({{ deck.id }})">编辑</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteDeck({{ deck.id }})">删除</button>
+                </div>
+            </div>
+            <p class="deck-description">{{ deck.description or '暂无描述' }}</p>
+            <div class="deck-stats">
+                <span>{{ deck.contents|length }} 个内容</span>
+            </div>
+            <!-- 在 templates/decks.html 中修改学习库操作 -->
+            <div class="deck-actions-main">
+                <!-- 使用智能学习入口 -->
+                <a href="{{ url_for('learn', deck_id=deck.id) }}" class="btn btn-primary">
+                    {% if deck.study_config and deck.study_config.is_configured %}
+                        继续学习
+                    {% else %}
+                        开始学习
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('study_setup', deck_id=deck.id) }}" class="btn btn-secondary">学习设置</a>
+                <a href="{{ url_for('content_management', deck_id=deck.id) }}" class="btn btn-info">管理内容</a>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="deck-card new-deck" onclick="showCreateDeckModal()">
+            <div class="new-deck-content">
+                <h3>+ 新建学习库</h3>
+                <p>创建自定义学习库</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建学习库模态框 -->
+<div id="createDeckModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>创建学习库</h3>
+            <span class="close" onclick="closeModal('createDeckModal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="createDeckForm">
+                <div class="form-group">
+                    <label for="deckName">学习库名称</label>
+                    <input type="text" id="deckName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="deckDescription">描述（可选）</label>
+                    <textarea id="deckDescription" name="description" rows="3"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('createDeckModal')">取消</button>
+            <button class="btn btn-primary" onclick="createDeck()">创建</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showCreateDeckModal() {
+    document.getElementById('createDeckModal').style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+async function createDeck() {
+    const form = document.getElementById('createDeckForm');
+    const formData = new FormData(form);
+
+    const deckData = {
+        name: formData.get('name'),
+        description: formData.get('description')
+    };
+
+    try {
+        const response = await fetch('/api/decks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(deckData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('学习库创建成功');
+            closeModal('createDeckModal');
+            location.reload();
+        } else {
+            alert('创建失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+async function deleteDeck(deckId) {
+    if (!confirm('确定要删除这个学习库吗？此操作不可恢复。')) {
+        return;
+    }
+
+    // 注意：这里需要先删除关联的内容，实际项目中应该实现这个API
+    alert('删除功能需要在后端实现关联删除逻辑');
+}
+</script>
+{% endblock %}

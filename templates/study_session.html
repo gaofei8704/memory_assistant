@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}学习会话 - 记忆助手{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="study-header">
+        <h2>学习会话</h2>
+        <div class="session-info">
+            <div class="session-progress">
+                <span id="progressText">0/0</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="endStudyEarly()">提前结束</button>
+        </div>
+    </div>
+
+    <div class="study-content" id="studyContent">
+        <div class="loading-message">
+            <p>加载学习内容中...</p>
+        </div>
+    </div>
+
+    <div class="study-controls" id="studyControls" style="display: none;">
+        <h3>你记住了吗？</h3>
+        <div class="feedback-buttons">
+            <button class="btn btn-easy" onclick="markAsTooEasy()">
+                <span>太简单了</span>
+                <small>我已经完全记住</small>
+            </button>
+            <button class="btn btn-remember" onclick="submitFeedback('remembered')">
+                <span>记住了</span>
+                <small>正确回答</small>
+            </button>
+            <button class="btn btn-forget" onclick="submitFeedback('forgotten')">
+                <span>忘记了</span>
+                <small>需要复习</small>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 当前学习会话状态
+let currentSession = {
+    id: {{ session.id }},
+    content: [],
+    currentIndex: 0,
+    startTime: Date.now()
+};
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadStudySession();
+});
+
+// 加载学习会话数据
+async function loadStudySession() {
+    try {
+        const response = await fetch(`/api/study/session/${currentSession.id}`);
+        const result = await response.json();
+
+        if (result.success) {
+            currentSession.content = result.content;
+            currentSession.currentIndex = 0;
+            showCurrentContent();
+            updateProgress();
+        } else {
+            showError(result.message || '加载学习内容失败');
+        }
+    } catch (error) {
+        showError('网络错误: ' + error.message);
+    }
+}
+
+// 显示当前学习内容
+function showCurrentContent() {
+    if (currentSession.content.length === 0) {
+        showEmptyState();
+        return;
+    }
+
+    if (currentSession.currentIndex >= currentSession.content.length) {
+        showCompletionState();
+        return;
+    }
+
+    const content = currentSession.content[currentSession.currentIndex];
+
+    document.getElementById('studyContent').innerHTML = `
+        <div class="content-card">
+            <div class="content-front">
+                <h3>${escapeHtml(content.display_text)}</h3>
+                ${content.example ? `<p class="example">${escapeHtml(content.example)}</p>` : ''}
+                <button class="btn btn-secondary" onclick="showAnswer()">显示答案</button>
+            </div>
+            <div class="content-back" style="display: none;">
+                <h3>${escapeHtml(content.answer)}</h3>
+                ${content.example ? `<p class="example">${escapeHtml(content.example)}</p>` : ''}
+                <button class="btn btn-secondary" onclick="showFeedbackControls()">我知道了</button>
+            </div>
+        </div>
+    `;
+
+    // 重置状态
+    document.getElementById('studyControls').style.display = 'none';
+    currentSession.startTime = Date.now();
+}
+
+// 显示答案
+function showAnswer() {
+    document.querySelector('.content-front').style.display = 'none';
+    document.querySelector('.content-back').style.display = 'block';
+    showFeedbackControls();
+}
+
+// 显示反馈控制按钮
+function showFeedbackControls() {
+    document.getElementById('studyControls').style.display = 'block';
+}
+
+// 提交学习反馈
+async function submitFeedback(feedbackType) {
+    const responseTime = Math.floor((Date.now() - currentSession.startTime) / 1000);
+    const currentContent = currentSession.content[currentSession.currentIndex];
+
+    try {
+        const response = await fetch('/api/study/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: currentSession.id,
+                content_id: currentContent.id,
+                feedback_type: feedbackType,
+                response_time: responseTime
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            moveToNextContent();
+        } else {
+            alert('提交失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+// 标记为太简单
+async function markAsTooEasy() {
+    const currentContent = currentSession.content[currentSession.currentIndex];
+
+    try {
+        const response = await fetch('/api/study/mark_too_easy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                content_id: currentContent.id,
+                session_id: currentSession.id
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            moveToNextContent();
+        } else {
+            alert('标记失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+// 移动到下一个内容
+async function moveToNextContent() {
+    currentSession.currentIndex++;
+
+    // 检查是否已完成
+    if (currentSession.currentIndex >= currentSession.content.length) {
+        await endStudySession(); // 自动结束会话
+        showCompletionState();
+    } else {
+        showCurrentContent();
+        updateProgress();
+    }
+}
+
+
+// 更新进度条
+function updateProgress() {
+    const total = Math.max(currentSession.content.length, 1);
+    const progress = (currentSession.currentIndex / total) * 100;
+
+    document.getElementById('progressFill').style.width = `${progress}%`;
+    document.getElementById('progressText').textContent =
+        `${currentSession.currentIndex}/${total}`;
+}
+
+// 提前结束学习
+async function endStudyEarly() {
+    if (!confirm('确定要提前结束学习吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/study/end', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: currentSession.id
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            window.location.href = '/';
+        } else {
+            alert('结束失败: ' + result.message);
+        }
+    } catch (error) {
+        alert('请求失败: ' + error.message);
+    }
+}
+
+// 显示空状态
+function showEmptyState() {
+    document.getElementById('studyContent').innerHTML = `
+        <div class="empty-state">
+            <p>没有可学习的内容</p>
+            <a href="/study/setup/{{ session.deck_id }}" class="btn btn-primary">返回设置</a>
+        </div>
+    `;
+}
+// 更新学习完成状态显示
+function showCompletionState() {
+    document.getElementById('studyContent').innerHTML = `        <div class="completion-state">
+            <h3>🎉 学习完成！</h3>
+            <p>您已完成本次学习计划</p>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="window.location.href='/'">返回首页</button>
+                <button class="btn btn-secondary" onclick="restartStudy()">重新学习</button>
+            </div>
+        </div>
+    `;
+}
+
+// 错误处理
+function showError(message) {
+    document.getElementById('studyContent').innerHTML = `
+        <div class="error-state">
+            <p>加载失败: ${escapeHtml(message)}</p>
+            <a href="/study/setup/{{ session.deck_id }}" class="btn btn-primary">返回设置</a>
+        </div>
+    `;
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+</script>
+{% endblock %}

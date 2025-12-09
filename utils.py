@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from models import ContentStatus,Content
-
+from aliyunsdkcore.client import AcsClient
+from aliyunsdkcore.request import CommonRequest
+import json
 
 def create_content_status(content_id):
     """创建内容学习状态记录"""
@@ -187,3 +189,23 @@ def update_content_status_based_on_ebbinghaus(status, quality, response_time):
         status.status = 'too_easy'
     else:
         status.status = 'learning'
+# utils/tts.py
+
+
+def synthesize_speech(text, access_key_id, access_key_secret, region_id='cn-shanghai'):
+    client = AcsClient(access_key_id, access_key_secret, region_id)
+
+    request = CommonRequest()
+    request.set_domain('nls-service.cn-shanghai.aliyuncs.com')
+    request.set_version('2018-08-01')
+    request.set_product('nls-service')
+    request.set_action_name('SynthesizeSpeech')
+    request.add_query_param('Text', text)
+    request.add_query_param('Voice', 'xiaoyun')  # 选择合适的发音人
+    request.add_query_param('Format', 'mp3')
+    request.add_query_param('SampleRate', 16000)
+
+    response = client.do_action_with_exception(request)
+    result = json.loads(response.decode('utf-8'))
+
+    return result['AudioUrl']  # 返回音频链接
